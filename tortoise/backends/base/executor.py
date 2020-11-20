@@ -20,7 +20,7 @@ from typing import (
 )
 
 from pypika import JoinType, Parameter, Query, Table
-from pypika.terms import ArithmeticExpression, Function
+from pypika.terms import ArithmeticExpression
 
 from tortoise.exceptions import OperationalError
 from tortoise.fields.base import Field
@@ -33,8 +33,8 @@ from tortoise.fields.relational import (
 from tortoise.query_utils import QueryModifier
 
 if TYPE_CHECKING:  # pragma: nocoverage
-    from tortoise.backends.base.client import BaseDBAsyncClient
     from tortoise.models import Model
+    from tortoise.backends.base.client import BaseDBAsyncClient
     from tortoise.query_utils import Prefetch
     from tortoise.queryset import QuerySet
 
@@ -236,7 +236,7 @@ class BaseExecutor:
     def get_update_sql(
         self,
         update_fields: Optional[Iterable[str]],
-        arithmetic_or_function: Optional[Dict[str, Union[ArithmeticExpression, Function]]],
+        arithmetic: Optional[Dict[str, ArithmeticExpression]],
     ) -> str:
         """
         Generates the SQL for updating a model depending on provided update_fields.
@@ -245,7 +245,7 @@ class BaseExecutor:
         key = ",".join(update_fields) if update_fields else ""
         if key in self.update_cache:
             return self.update_cache[key]
-        arithmetic_or_function = arithmetic_or_function or {}
+        arithmetic = arithmetic or {}
         table = self.model._meta.basetable
         query = self.db.query_class.update(table)
         count = 0
@@ -253,11 +253,11 @@ class BaseExecutor:
             db_column = self.model._meta.fields_db_projection[field]
             field_object = self.model._meta.fields_map[field]
             if not field_object.pk:
-                if db_column not in arithmetic_or_function.keys():
+                if db_column not in arithmetic.keys():
                     query = query.set(db_column, self.parameter(count))
                     count += 1
                 else:
-                    query = query.set(db_column, arithmetic_or_function.get(db_column))
+                    query = query.set(db_column, arithmetic.get(db_column))
 
         query = query.where(table[self.model._meta.db_pk_column] == self.parameter(count))
 
@@ -268,20 +268,18 @@ class BaseExecutor:
         self, instance: "Union[Type[Model], Model]", update_fields: Optional[Iterable[str]]
     ) -> int:
         values = []
-        arithmetic_or_function = {}
+        arithmetic = {}
         for field in update_fields or self.model._meta.fields_db_projection.keys():
             if not self.model._meta.fields_map[field].pk:
                 instance_field = getattr(instance, field)
-                if isinstance(instance_field, (ArithmeticExpression, Function)):
-                    arithmetic_or_function[field] = instance_field
+                if isinstance(instance_field, ArithmeticExpression):
+                    arithmetic[field] = instance_field
                 else:
                     value = self.column_map[field](instance_field, instance)
                     values.append(value)
         values.append(self.model._meta.pk.to_db_value(instance.pk, instance))
         return (
-            await self.db.execute_query(
-                self.get_update_sql(update_fields, arithmetic_or_function), values
-            )
+            await self.db.execute_query(self.get_update_sql(update_fields, arithmetic), values)
         )[0]
 
     async def execute_delete(self, instance: "Union[Type[Model], Model]") -> int:
@@ -331,8 +329,7 @@ class BaseExecutor:
         for instance in instance_list:
             relation_container = getattr(instance, field)
             relation_container._set_result_for_query(
-                related_object_map.get(getattr(instance, related_field_name), []),
-                to_attr,
+                related_object_map.get(getattr(instance, related_field_name), []), to_attr,
             )
         return instance_list
 
@@ -371,9 +368,7 @@ class BaseExecutor:
         for instance in instance_list:
             obj = related_object_map.get(getattr(instance, related_field_name), None)
             setattr(
-                instance,
-                f"_{field}",
-                obj,
+                instance, f"_{field}", obj,
             )
             if to_attr:
                 setattr(instance, to_attr, obj)
@@ -391,7 +386,9 @@ class BaseExecutor:
             for instance in instance_list
         }
 
-        field_object: ManyToManyFieldInstance = self.model._meta.fields_map[field]  # type: ignore
+        field_object: ManyToManyFieldInstance = self.model._meta.fields_map[  # type: ignore
+            field
+        ]
 
         through_table = Table(field_object.through)
 

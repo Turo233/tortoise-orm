@@ -16,6 +16,7 @@ from tortoise.fields.data import (
     TextField,
     TimeDeltaField,
     UUIDField,
+    TinyIntField,
 )
 from tortoise.fields.relational import (
     BackwardFKRelation,

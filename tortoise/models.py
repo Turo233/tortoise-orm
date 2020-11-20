@@ -334,10 +334,7 @@ class MetaInfo:
                         to_field=to_field,
                     ),
                     partial(
-                        _fk_setter,
-                        _key=_key,
-                        relation_field=relation_field,
-                        to_field=to_field,
+                        _fk_setter, _key=_key, relation_field=relation_field, to_field=to_field,
                     ),
                     partial(
                         _fk_setter,
@@ -385,10 +382,7 @@ class MetaInfo:
                         to_field=to_field,
                     ),
                     partial(
-                        _fk_setter,
-                        _key=_key,
-                        relation_field=relation_field,
-                        to_field=to_field,
+                        _fk_setter, _key=_key, relation_field=relation_field, to_field=to_field,
                     ),
                     partial(
                         _fk_setter,
@@ -807,36 +801,18 @@ class Model(metaclass=ModelMeta):
         if listener not in cls_listeners:
             cls_listeners.append(listener)
 
-    async def _pre_delete(
-        self,
-        using_db: Optional[BaseDBAsyncClient] = None,
-    ) -> None:
+    async def _pre_delete(self, using_db: Optional[BaseDBAsyncClient] = None,) -> None:
         listeners = []
         cls_listeners = self._listeners.get(Signals.pre_delete, {}).get(self.__class__, [])
         for listener in cls_listeners:
-            listeners.append(
-                listener(
-                    self.__class__,
-                    self,
-                    using_db,
-                )
-            )
+            listeners.append(listener(self.__class__, self, using_db,))
         await asyncio.gather(*listeners)
 
-    async def _post_delete(
-        self,
-        using_db: Optional[BaseDBAsyncClient] = None,
-    ) -> None:
+    async def _post_delete(self, using_db: Optional[BaseDBAsyncClient] = None,) -> None:
         listeners = []
         cls_listeners = self._listeners.get(Signals.post_delete, {}).get(self.__class__, [])
         for listener in cls_listeners:
-            listeners.append(
-                listener(
-                    self.__class__,
-                    self,
-                    using_db,
-                )
-            )
+            listeners.append(listener(self.__class__, self, using_db,))
         await asyncio.gather(*listeners)
 
     async def _pre_save(
@@ -955,29 +931,6 @@ class Model(metaclass=ModelMeta):
         db = using_db or self._meta.db
         await db.executor_class(model=self.__class__, db=db).fetch_for_list([self], *args)
 
-    async def refresh_from_db(
-        self, fields: Optional[Iterable[str]] = None, using_db: Optional[BaseDBAsyncClient] = None
-    ) -> None:
-        """
-        Refresh latest data from db.
-
-        .. code-block:: python3
-
-            user.refresh_from_db(fields=['name'])
-
-        :param fields: The special fields that to be refreshed.
-        :param using_db: Specific DB connection to use instead of default bound.
-
-        :raises OperationalError: If object has never been persisted.
-        """
-        if not self._saved_in_db:
-            raise OperationalError("Can't refresh unpersisted record")
-        qs = QuerySet(self.__class__).only(*(fields or []))
-        using_db and qs.using_db(using_db)
-        obj = await qs.get(pk=self.pk)
-        for field in fields or self._meta.fields_map:
-            setattr(self, field, getattr(obj, field, None))
-
     @classmethod
     async def get_or_create(
         cls: Type[MODEL],
@@ -1034,9 +987,7 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     async def bulk_create(
-        cls: Type[MODEL],
-        objects: Iterable[MODEL],
-        using_db: Optional[BaseDBAsyncClient] = None,
+        cls: Type[MODEL], objects: Iterable[MODEL], using_db: Optional[BaseDBAsyncClient] = None,
     ) -> None:
         """
         Bulk insert operation:

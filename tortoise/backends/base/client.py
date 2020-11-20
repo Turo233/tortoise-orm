@@ -143,7 +143,7 @@ class BaseDBAsyncClient:
     def _in_transaction(self) -> "TransactionContext":
         raise NotImplementedError()  # pragma: nocoverage
 
-    async def execute_insert(self, query: str, values: list) -> Any:
+    async def execute_insert(self, query: str, values: list, instance) -> Any:
         """
         Executes a RAW SQL insert statement, with provided parameters.
 
