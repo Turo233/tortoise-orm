@@ -207,6 +207,8 @@ class MSSqlClient(BaseDBAsyncClient):
                 await cursor.execute(query, values)
                 if "UPDATE" in query:
                     return cursor.rowcount, []
+                if "DELETE" in query:
+                    return cursor.rowcount, []
                 rows = await cursor.fetchall()
                 if rows:
                     return cursor.rowcount, [dict(zip([l[0].lower() for l in row.cursor_description], row)) for row in
