@@ -63,8 +63,8 @@ class MSSQLSchemaGenerator(BaseSchemaGenerator):
         else:
             if auto_now_add:
                 default_str += " getdate()"
-            if auto_now:
-                default_str += " getdate()"
+            # if auto_now:  # todo sql server 未发现此语法
+            #     default_str += " getdate()"
         return default_str
 
     def _escape_default_value(self, default: Any):
